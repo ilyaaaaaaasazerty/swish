@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>الإعدادات | لوحة التحكم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/css/admin.css" />
+</head>
+<body data-page="settings">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-logo"><span>Swish</span></div>
+      <nav class="sb-nav">
+        <a href="/admin/dashboard.html"><span class="ic">📊</span> لوحة المعلومات</a>
+        <a href="/admin/orders.html"><span class="ic">📦</span> الطلبات</a>
+        <a href="/admin/products.html"><span class="ic">🧢</span> المنتجات</a>
+        <a href="/admin/settings.html" class="active"><span class="ic">⚙️</span> الإعدادات</a>
+      </nav>
+      <div class="sb-foot">
+        <a href="/" target="_blank" class="sb-view">👁️ عرض المتجر</a>
+        <button class="btn-logout" id="logoutBtn">تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div><h1>الإعدادات</h1><div class="sub">معلومات المتجر و Meta Pixel</div></div>
+        </div>
+      </div>
+
+      <!-- Meta Pixel -->
+      <div class="pixel-box">
+        <h3>📈 Meta Pixel (Facebook Pixel)</h3>
+        <p>ألصق معرّف البيكسل (Pixel ID) لتتبّع الزوار والمبيعات وإعلانات فيسبوك/إنستغرام. الأحداث المُرسَلة تلقائيًا: <b>PageView, ViewContent, InitiateCheckout, Purchase, Lead</b> (بعملة DZD).</p>
+        <div class="pixel-input">
+          <input type="text" id="sPixel" placeholder="مثال: 123456789012345" />
+          <button class="btn btn-ghost" id="savePixel">حفظ البيكسل</button>
+        </div>
+        <div class="pixel-status" id="pixelStatus"></div>
+      </div>
+
+      <!-- معلومات المتجر -->
+      <div class="panel">
+        <div class="panel-head"><h2>معلومات المتجر</h2></div>
+        <div class="panel-body">
+          <form id="settingsForm" class="form-grid">
+            <div class="grid-2">
+              <div class="fg"><label>اسم المتجر</label><input type="text" id="sStoreName" /></div>
+              <div class="fg"><label>رقم الهاتف</label><input type="text" id="sPhone" placeholder="0555 00 00 00" /></div>
+            </div>
+            <div class="fg"><label>الشعار / الوصف المختصر</label><input type="text" id="sTagline" /></div>
+            <div class="fg"><label>شريط الإعلان (أعلى الصفحة)</label><input type="text" id="sAnnouncement" /></div>
+            <div class="grid-3">
+              <div class="fg"><label>رمز العملة</label><input type="text" id="sCurrency" placeholder="دج" /></div>
+              <div class="fg"><label>التوصيل المجاني ابتداءً من (دج)</label><input type="number" id="sFreeShip" min="0" placeholder="0 = معطّل" /><span class="hint">0 يعني معطّل</span></div>
+              <div class="fg"><label>رقم واتساب (دولي)</label><input type="text" id="sWhatsapp" placeholder="213555000000" /></div>
+            </div>
+            <div class="grid-2">
+              <div class="fg"><label>رابط فيسبوك</label><input type="url" id="sFacebook" placeholder="https://facebook.com/..." /></div>
+              <div class="fg"><label>رابط إنستغرام</label><input type="url" id="sInstagram" placeholder="https://instagram.com/..." /></div>
+            </div>
+            <div class="grid-2">
+              <div class="fg"><label>قيمة التقييم (من 5)</label><input type="number" id="sRatingValue" step="0.1" min="0" max="5" /></div>
+              <div class="fg"><label>عدد التقييمات</label><input type="number" id="sRatingCount" min="0" /></div>
+            </div>
+            <div><button type="button" class="btn btn-brand" id="saveSettings">💾 حفظ الإعدادات</button></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- الأمان -->
+      <div class="panel">
+        <div class="panel-head"><h2>الأمان — بيانات الدخول</h2></div>
+        <div class="panel-body">
+          <form id="accountForm" class="form-grid" style="max-width:520px">
+            <div class="fg"><label>كلمة المرور الحالية *</label><input type="password" id="aCurrent" autocomplete="current-password" /></div>
+            <div class="grid-2">
+              <div class="fg"><label>اسم مستخدم جديد (اختياري)</label><input type="text" id="aUsername" autocomplete="username" /></div>
+              <div class="fg"><label>كلمة مرور جديدة (اختياري)</label><input type="password" id="aPassword" autocomplete="new-password" /></div>
+            </div>
+            <div><button type="button" class="btn btn-brand" id="saveAccount">تحديث بيانات الدخول</button></div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+  <script src="/admin/js/admin.js"></script>
+</body>
+</html>

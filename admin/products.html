@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>المنتجات | لوحة التحكم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/css/admin.css" />
+</head>
+<body data-page="products">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-logo"><span>Swish</span></div>
+      <nav class="sb-nav">
+        <a href="/admin/dashboard.html"><span class="ic">📊</span> لوحة المعلومات</a>
+        <a href="/admin/orders.html"><span class="ic">📦</span> الطلبات</a>
+        <a href="/admin/products.html" class="active"><span class="ic">🧢</span> المنتجات</a>
+        <a href="/admin/settings.html"><span class="ic">⚙️</span> الإعدادات</a>
+      </nav>
+      <div class="sb-foot">
+        <a href="/" target="_blank" class="sb-view">👁️ عرض المتجر</a>
+        <button class="btn-logout" id="logoutBtn">تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div><h1>المنتجات</h1><div class="sub">أضف وحرّر منتجات المتجر</div></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="bulkBtn">⇪ إضافة مجمّعة (+100)</button>
+          <button class="btn btn-brand" id="addProductBtn">＋ إضافة منتج</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>المنتج</th><th>السعر</th><th>السعر القديم</th><th>المخزون</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <tbody id="productsBody"><tr><td colspan="6" class="spinner">جاري التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- مودال المنتج -->
+  <div class="modal" id="productModal" hidden>
+    <div class="modal-card lg">
+      <div class="modal-head">
+        <h3 id="pmTitle">إضافة منتج</h3>
+        <button class="modal-x" data-close>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="productForm" class="form-grid">
+          <input type="hidden" id="pId" />
+          <div class="fg">
+            <label>اسم المنتج *</label>
+            <input type="text" id="pName" required />
+          </div>
+          <div class="grid-3">
+            <div class="fg"><label>السعر (دج) *</label><input type="number" id="pPrice" min="0" required /></div>
+            <div class="fg"><label>السعر القديم (اختياري)</label><input type="number" id="pOldPrice" min="0" /></div>
+            <div class="fg"><label>المخزون</label><input type="number" id="pStock" min="0" placeholder="غير محدد" /></div>
+          </div>
+          <div class="fg">
+            <label>الوصف</label>
+            <textarea id="pDesc" rows="3"></textarea>
+          </div>
+          <div class="grid-2">
+            <div class="fg"><label>الألوان (افصل بفاصلة، اختياري)</label><input type="text" id="pColors" placeholder="أسود, أبيض, كحلي" /></div>
+            <div class="fg"><label>شارة (Badge)</label><input type="text" id="pBadge" placeholder="الأكثر مبيعًا / جديد" /></div>
+          </div>
+          <div class="fg"><label class="switch"><input type="checkbox" id="pActive" checked /> منتج مُفعّل (يظهر في المتجر)</label></div>
+          <div class="fg">
+            <label>صور المنتج</label>
+            <div class="img-list" id="imgList"></div>
+            <label class="uploader" id="uploader">📷 اضغط لرفع صورة (JPG/PNG حتى 5MB)
+              <input type="file" id="imgInput" accept="image/*" hidden />
+            </label>
+            <div class="fg" style="margin-top:8px">
+              <input type="url" id="imgUrl" placeholder="أو الصق رابط صورة واضغط Enter" />
+              <span class="hint">يمكنك رفع صورة أو إضافة رابط صورة خارجي</span>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-brand" id="saveProduct">حفظ المنتج</button>
+        <button class="btn btn-ghost" data-close>إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال الإضافة المجمّعة -->
+  <div class="modal" id="bulkModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>إضافة مجمّعة — موديلات متعددة باسم واحد</h3>
+        <button class="modal-x" data-bulkclose>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="bulkForm" class="form-grid" onsubmit="return false">
+          <div class="fg"><label>الاسم المشترك لكل الموديلات *</label><input type="text" id="bName" placeholder="مثال: Swish Cap" /></div>
+          <div class="grid-3">
+            <div class="fg"><label>السعر (دج)</label><input type="number" id="bPrice" min="0" placeholder="2500" /></div>
+            <div class="fg"><label>السعر القديم</label><input type="number" id="bOldPrice" min="0" placeholder="3500" /></div>
+            <div class="fg"><label>شارة (اختياري)</label><input type="text" id="bBadge" /></div>
+          </div>
+          <div class="fg">
+            <label>صور الموديلات — اختر عدة صور (موديل لكل صورة)</label>
+            <label class="uploader" id="bulkUploader">اضغط لاختيار صور متعددة (JPG/PNG)
+              <input type="file" id="bulkFiles" accept="image/*" multiple hidden />
+            </label>
+            <div class="img-list" id="bulkPreview"></div>
+          </div>
+          <div class="fg">
+            <label>أو: عدد موديلات فارغة (إن لم ترفع صورًا)</label>
+            <input type="number" id="bCount" min="0" max="300" placeholder="مثال: 100" />
+            <span class="hint">إن رفعت صورًا، يُنشأ موديل لكل صورة ويُتجاهل هذا الحقل.</span>
+          </div>
+          <div id="bulkStatus" class="hint" style="min-height:18px"></div>
+        </form>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-brand" id="bulkSave">إنشاء الموديلات</button>
+        <button class="btn btn-ghost" data-bulkclose>إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+  <script src="/admin/js/admin.js"></script>
+</body>
+</html>

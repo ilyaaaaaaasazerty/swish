@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة المعلومات | لوحة التحكم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/css/admin.css" />
+</head>
+<body data-page="dashboard">
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-logo"><span>Swish</span></div>
+      <nav class="sb-nav">
+        <a href="/admin/dashboard.html" class="active"><span class="ic">📊</span> لوحة المعلومات</a>
+        <a href="/admin/orders.html"><span class="ic">📦</span> الطلبات</a>
+        <a href="/admin/products.html"><span class="ic">🧢</span> المنتجات</a>
+        <a href="/admin/settings.html"><span class="ic">⚙️</span> الإعدادات</a>
+      </nav>
+      <div class="sb-foot">
+        <a href="/" target="_blank" class="sb-view">👁️ عرض المتجر</a>
+        <button class="btn-logout" id="logoutBtn">تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div>
+            <h1>لوحة المعلومات</h1>
+            <div class="sub">نظرة عامة على أداء متجرك</div>
+          </div>
+        </div>
+        <a href="/admin/products.html" class="btn btn-brand">＋ إضافة منتج</a>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="spinner">جاري التحميل...</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>المبيعات — آخر 7 أيام</h2></div>
+        <div class="panel-body"><div id="chart7"></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>أحدث الطلبات</h2>
+          <a href="/admin/orders.html" class="btn btn-ghost btn-sm">عرض الكل</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>المرجع</th><th>العميل</th><th>المنتج</th><th>الولاية</th><th>المجموع</th><th>الحالة</th></tr></thead>
+            <tbody id="recentOrders"><tr><td colspan="6" class="spinner">جاري التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="toast-wrap" id="toastWrap"></div>
+  <script src="/admin/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+pics/
+npm-debug.log*
+.DS_Store
+cookies.txt
+.vercel
+# ملفات الرفع المؤقتة وقت التشغيل (لا تُرفع)؛ صور الكتالوج swish-*.jpg تُرفع
+public/uploads/p_*

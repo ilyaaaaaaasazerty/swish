@@ -1,0 +1,70 @@
+// قائمة الولايات الجزائرية الـ58 مع أسعار التوصيل الافتراضية (دج)
+// home = التوصيل إلى المنزل، desk = التوصيل إلى مكتب التوصيل (ستوب ديسك)
+// يمكن لصاحب المتجر تعديل الأسعار من لوحة التحكم لاحقًا.
+
+const WILAYAS = [
+  { code: 1, name: "أدرار", home: 1000, desk: 600 },
+  { code: 2, name: "الشلف", home: 750, desk: 450 },
+  { code: 3, name: "الأغواط", home: 800, desk: 500 },
+  { code: 4, name: "أم البواقي", home: 750, desk: 450 },
+  { code: 5, name: "باتنة", home: 750, desk: 450 },
+  { code: 6, name: "بجاية", home: 750, desk: 450 },
+  { code: 7, name: "بسكرة", home: 800, desk: 500 },
+  { code: 8, name: "بشار", home: 1000, desk: 600 },
+  { code: 9, name: "البليدة", home: 600, desk: 400 },
+  { code: 10, name: "البويرة", home: 700, desk: 450 },
+  { code: 11, name: "تمنراست", home: 1200, desk: 800 },
+  { code: 12, name: "تبسة", home: 800, desk: 500 },
+  { code: 13, name: "تلمسان", home: 800, desk: 500 },
+  { code: 14, name: "تيارت", home: 750, desk: 450 },
+  { code: 15, name: "تيزي وزو", home: 700, desk: 450 },
+  { code: 16, name: "الجزائر", home: 500, desk: 350 },
+  { code: 17, name: "الجلفة", home: 800, desk: 500 },
+  { code: 18, name: "جيجل", home: 750, desk: 450 },
+  { code: 19, name: "سطيف", home: 750, desk: 450 },
+  { code: 20, name: "سعيدة", home: 800, desk: 500 },
+  { code: 21, name: "سكيكدة", home: 750, desk: 450 },
+  { code: 22, name: "سيدي بلعباس", home: 800, desk: 500 },
+  { code: 23, name: "عنابة", home: 750, desk: 450 },
+  { code: 24, name: "قالمة", home: 750, desk: 450 },
+  { code: 25, name: "قسنطينة", home: 750, desk: 450 },
+  { code: 26, name: "المدية", home: 700, desk: 450 },
+  { code: 27, name: "مستغانم", home: 750, desk: 450 },
+  { code: 28, name: "المسيلة", home: 750, desk: 450 },
+  { code: 29, name: "معسكر", home: 800, desk: 500 },
+  { code: 30, name: "ورقلة", home: 900, desk: 550 },
+  { code: 31, name: "وهران", home: 700, desk: 450 },
+  { code: 32, name: "البيض", home: 900, desk: 550 },
+  { code: 33, name: "إليزي", home: 1400, desk: 900 },
+  { code: 34, name: "برج بوعريريج", home: 750, desk: 450 },
+  { code: 35, name: "بومرداس", home: 600, desk: 400 },
+  { code: 36, name: "الطارف", home: 800, desk: 500 },
+  { code: 37, name: "تندوف", home: 1400, desk: 900 },
+  { code: 38, name: "تيسمسيلت", home: 800, desk: 500 },
+  { code: 39, name: "الوادي", home: 900, desk: 550 },
+  { code: 40, name: "خنشلة", home: 800, desk: 500 },
+  { code: 41, name: "سوق أهراس", home: 800, desk: 500 },
+  { code: 42, name: "تيبازة", home: 600, desk: 400 },
+  { code: 43, name: "ميلة", home: 750, desk: 450 },
+  { code: 44, name: "عين الدفلى", home: 750, desk: 450 },
+  { code: 45, name: "النعامة", home: 1000, desk: 600 },
+  { code: 46, name: "عين تموشنت", home: 800, desk: 500 },
+  { code: 47, name: "غرداية", home: 900, desk: 550 },
+  { code: 48, name: "غليزان", home: 750, desk: 450 },
+  { code: 49, name: "تيميمون", home: 1200, desk: 800 },
+  { code: 50, name: "برج باجي مختار", home: 1400, desk: 900 },
+  { code: 51, name: "أولاد جلال", home: 850, desk: 550 },
+  { code: 52, name: "بني عباس", home: 1200, desk: 800 },
+  { code: 53, name: "عين صالح", home: 1300, desk: 850 },
+  { code: 54, name: "عين قزام", home: 1400, desk: 900 },
+  { code: 55, name: "تقرت", home: 900, desk: 550 },
+  { code: 56, name: "جانت", home: 1400, desk: 900 },
+  { code: 57, name: "المغير", home: 900, desk: 550 },
+  { code: 58, name: "المنيعة", home: 1000, desk: 600 }
+];
+
+function getWilaya(code) {
+  return WILAYAS.find((w) => w.code === Number(code));
+}
+
+module.exports = { WILAYAS, getWilaya };

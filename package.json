@@ -1,0 +1,19 @@
+{
+  "name": "swish-store",
+  "version": "2.0.0",
+  "description": "Swish — متجر قبعات ستريت وير (Liquid Glass) — الدفع عند الاستلام — Firestore + Vercel",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "seed": "node scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^2.0.1"
+  }
+}
