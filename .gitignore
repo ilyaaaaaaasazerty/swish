@@ -1,5 +1,12 @@
 node_modules/
 pics/
+# أسرار — لا تُرفع أبدًا
+service-account.json
+*firebase-adminsdk*.json
+*serviceaccount*.json
+.env
+.env.*
+secrets/
 npm-debug.log*
 .DS_Store
 cookies.txt
