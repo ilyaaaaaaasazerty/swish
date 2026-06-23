@@ -33,6 +33,8 @@
     <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z" fill="currentColor"/></symbol>
     <symbol id="i-bag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l-1 13H7zM9 7a3 3 0 016 0"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4l2 5-3 2a12 12 0 006 6l2-3 5 2v4a2 2 0 01-2 2A17 17 0 013 5a2 2 0 012-2z"/></symbol>
   </svg>
 
@@ -63,21 +65,14 @@
       <!-- ===== الفورم ===== -->
       <section class="glass order">
         <form id="orderForm" novalidate>
-          <!-- الموديل المختار -->
-          <div class="picked" id="picked">
-            <div class="picked-thumb"><img id="pkImg" alt="" /></div>
-            <div class="picked-info">
-              <div class="picked-label">موديلك المختار</div>
-              <div class="picked-name" id="pkName">—</div>
-              <div class="picked-price"><span id="pkNow">0</span> <span class="cur" id="pkCur">دج</span><span class="picked-old" id="pkOld"></span></div>
-            </div>
+          <!-- عرض الباقة -->
+          <div class="bundle-banner" id="bundleBanner" hidden>
+            <svg aria-hidden="true"><use href="#i-tag"/></svg>
+            <span id="bundleText"></span>
           </div>
 
-          <div class="fld" id="colorFld" style="display:none">
-            <label>اللون</label>
-            <div class="cs" id="colorCs"></div>
-            <input type="hidden" id="fColor" name="color" />
-          </div>
+          <!-- سلّة الموديلات المختارة -->
+          <div class="cart" id="cart"></div>
 
           <div class="fld">
             <label for="fName">الاسم الكامل <i>*</i></label>
@@ -112,19 +107,10 @@
             <small class="err" id="errAddress"></small>
           </div>
 
-          <div class="fld qtyfld">
-            <label>الكمية</label>
-            <div class="qty">
-              <button type="button" id="qMinus" aria-label="إنقاص"><svg aria-hidden="true"><use href="#i-minus"/></svg></button>
-              <input type="number" id="fQty" name="quantity" value="1" min="1" max="99" />
-              <button type="button" id="qPlus" aria-label="زيادة"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
-            </div>
-          </div>
-
           <!-- الملخص -->
           <div class="totals">
-            <div class="t-row"><span>المجموع الفرعي</span><span><span id="tSub">0</span> <span class="cur"></span></span></div>
-            <div class="t-row t-save" id="tSaveRow" hidden><span>وفّرت</span><span id="tSave">0</span></div>
+            <div class="t-row"><span>المجموع الفرعي (<span id="tQty">0</span> قطعة)</span><span><span id="tSub">0</span> <span class="cur"></span></span></div>
+            <div class="t-row t-save" id="tSaveRow" hidden><span>توفير الباقة</span><span id="tSave">0</span></div>
             <div class="t-row"><span>التوصيل</span><span id="tDeliv">—</span></div>
             <div class="t-row t-total"><span>الإجمالي</span><span><span id="tTotal">0</span> <span class="cur"></span></span></div>
           </div>

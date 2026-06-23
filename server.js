@@ -43,6 +43,9 @@ const DEFAULT_SETTINGS = {
   instagramUrl: "",
   ratingValue: 4.9,
   ratingCount: 1240,
+  bundleEnabled: false,
+  bundleSize: 2,
+  bundlePrice: 0,
 };
 
 app.use(express.json({ limit: "2mb" }));
@@ -80,8 +83,29 @@ function publicSettings(s) {
     instagramUrl: s.instagramUrl || "",
     ratingValue: s.ratingValue || 4.9,
     ratingCount: s.ratingCount || 0,
+    bundleEnabled: !!s.bundleEnabled && Number(s.bundlePrice) > 0 && Number(s.bundleSize) >= 2,
+    bundleSize: Number(s.bundleSize) || 2,
+    bundlePrice: Number(s.bundlePrice) || 0,
   };
 }
+
+// تسعير الباقة "N قطع بـ X": نوسّع الوحدات ونرتّبها تنازليًا، كل N وحدة بسعر الباقة، والباقي بسعرها
+function priceUnits(unitPrices, s) {
+  const regular = unitPrices.reduce((a, b) => a + b, 0);
+  const enabled = !!s.bundleEnabled && Number(s.bundlePrice) > 0 && Number(s.bundleSize) >= 2;
+  if (!enabled || unitPrices.length < Number(s.bundleSize)) {
+    return { subtotal: regular, regular, savings: 0 };
+  }
+  const N = Math.floor(Number(s.bundleSize));
+  const X = Number(s.bundlePrice);
+  const sorted = [...unitPrices].sort((a, b) => b - a);
+  const packs = Math.floor(sorted.length / N);
+  const packed = packs * N;
+  const remainder = sorted.slice(packed).reduce((a, b) => a + b, 0);
+  const subtotal = packs * X + remainder;
+  return { subtotal, regular, savings: Math.max(0, regular - subtotal) };
+}
+
 function sanitizeProductPublic(p) {
   return {
     id: p.id, name: p.name, slug: p.slug, price: p.price, oldPrice: p.oldPrice || null,
@@ -121,30 +145,46 @@ app.post("/api/orders", asyncH(async (req, res) => {
   const fullName = String(b.fullName || "").trim();
   const phone = String(b.phone || "").trim();
   const address = String(b.address || "").trim();
-  const quantity = Math.max(1, Math.min(99, parseInt(b.quantity, 10) || 1));
   const deliveryType = b.deliveryType === "desk" ? "desk" : "home";
-  let color = String(b.color || "").trim().slice(0, 60);
   const note = String(b.note || "").trim().slice(0, 500);
+
+  // دعم سلة متعددة (items[]) مع توافق مع الطلب المفرد (productId)
+  let rawItems = Array.isArray(b.items) && b.items.length
+    ? b.items
+    : (b.productId ? [{ productId: b.productId, quantity: b.quantity, color: b.color }] : []);
+  if (!rawItems.length) errors.push("اختر قبعة واحدة على الأقل");
 
   if (fullName.length < 3) errors.push("الاسم الكامل مطلوب");
   if (!validatePhone(phone)) errors.push("رقم الهاتف غير صحيح");
   const wilaya = getWilaya(Number(b.wilaya));
   if (!wilaya) errors.push("يُرجى اختيار الولاية");
   if (address.length < 3 && deliveryType === "home") errors.push("العنوان مطلوب للتوصيل إلى المنزل");
-  const product = await store.getProduct(b.productId);
-  if (!product || product.active === false) errors.push("المنتج غير متوفر");
+
+  // بناء عناصر الطلب من المنتجات الفعلية
+  const items = [];
+  const unitPrices = [];
+  for (const ri of rawItems.slice(0, 50)) {
+    const product = await store.getProduct(ri.productId);
+    if (!product || product.active === false) continue;
+    const qty = Math.max(1, Math.min(99, parseInt(ri.quantity, 10) || 1));
+    let color = String(ri.color || "").trim().slice(0, 60);
+    if (Array.isArray(product.colors) && product.colors.length && color && !product.colors.includes(color)) color = "";
+    const unitPrice = Number(product.price) || 0;
+    items.push({ productId: product.id, productName: product.name, image: (product.images || [])[0] || "", color, unitPrice, quantity: qty });
+    for (let k = 0; k < qty; k++) unitPrices.push(unitPrice);
+  }
+  if (!items.length && !errors.length) errors.push("المنتجات غير متوفرة");
   if (errors.length) return res.status(400).json({ error: errors.join("، "), errors });
 
-  if (Array.isArray(product.colors) && product.colors.length && color && !product.colors.includes(color)) color = "";
-
-  const unitPrice = Number(product.price) || 0;
-  const subtotal = unitPrice * quantity;
   const settings = await settingsOr();
+  const { subtotal, regular, savings } = priceUnits(unitPrices, settings);
+
   let deliveryFee = deliveryType === "desk" ? wilaya.desk : wilaya.home;
   const threshold = Number(settings.freeShippingThreshold) || 0;
   let freeShipping = false;
   if (threshold > 0 && subtotal >= threshold) { deliveryFee = 0; freeShipping = true; }
   const total = subtotal + deliveryFee;
+  const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
   const id = await store.nextId("orders");
   const ref = `#${id}`;
@@ -153,14 +193,19 @@ app.post("/api/orders", asyncH(async (req, res) => {
     id, ref, status: "pending",
     customer: { fullName, phone },
     shipping: { wilayaCode: wilaya.code, wilayaName: wilaya.name, address, deliveryType },
-    item: { productId: product.id, productName: product.name, color, unitPrice, quantity },
-    pricing: { subtotal, deliveryFee, freeShipping, total, currency: settings.currency || "دج" },
+    items,
+    totalQty,
+    pricing: {
+      regularSubtotal: regular, subtotal, bundleSavings: savings,
+      deliveryFee, freeShipping, total, currency: settings.currency || "دج",
+      bundle: settings.bundleEnabled ? { size: Number(settings.bundleSize) || 2, price: Number(settings.bundlePrice) || 0 } : null,
+    },
     note,
     history: [{ status: "pending", at: now, by: "customer" }],
     createdAt: now, updatedAt: now,
   };
   await store.createOrder(order);
-  res.status(201).json({ ok: true, ref, orderId: id, subtotal, total, currency: order.pricing.currency });
+  res.status(201).json({ ok: true, ref, orderId: id, subtotal, savings, total, currency: order.pricing.currency });
 }));
 
 // ============================================================
@@ -307,7 +352,7 @@ adminApi.get("/settings", asyncH(async (req, res) => res.json(await settingsOr()
 adminApi.put("/settings", asyncH(async (req, res) => {
   const cur = await settingsOr();
   const b = req.body || {};
-  const allowed = ["storeName", "tagline", "phone", "currency", "metaPixelId", "freeShippingThreshold", "announcement", "facebookUrl", "instagramUrl", "ratingValue", "ratingCount"];
+  const allowed = ["storeName", "tagline", "phone", "currency", "metaPixelId", "freeShippingThreshold", "announcement", "facebookUrl", "instagramUrl", "ratingValue", "ratingCount", "bundleEnabled", "bundleSize", "bundlePrice"];
   const next = { ...cur };
   allowed.forEach((k) => { if (b[k] !== undefined) next[k] = b[k]; });
   if (b.metaPixelId !== undefined) next.metaPixelId = sanitizePixelId(b.metaPixelId);
@@ -316,6 +361,9 @@ adminApi.put("/settings", asyncH(async (req, res) => {
   next.freeShippingThreshold = Math.max(0, Number(next.freeShippingThreshold) || 0);
   next.ratingValue = Math.min(5, Math.max(0, Number(next.ratingValue) || 4.9));
   next.ratingCount = Math.max(0, Number(next.ratingCount) || 0);
+  next.bundleEnabled = !!next.bundleEnabled;
+  next.bundleSize = Math.max(2, Math.min(10, Number(next.bundleSize) || 2));
+  next.bundlePrice = Math.max(0, Number(next.bundlePrice) || 0);
   next.updatedAt = new Date().toISOString();
   await store.saveSettings(next);
   res.json(next);

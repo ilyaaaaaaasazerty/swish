@@ -1,11 +1,12 @@
-/* ===================== Swish — landing logic ===================== */
+/* ===================== Swish — landing logic (cart + bundle) ===================== */
 (function () {
   "use strict";
 
   const state = {
-    settings: {}, wilayas: [], products: [], current: null, index: 0,
+    settings: {}, wilayas: [], products: [], index: 0,
+    cart: new Map(), // productId -> { product, qty, color }
     pixel: { viewed: new Set(), checkout: false },
-    wilayaSel: null, colorSel: null,
+    wilayaSel: null, manyDots: false,
   };
 
   const $ = (s) => document.querySelector(s);
@@ -40,7 +41,7 @@
     buildCarousel(); initCarousel();
     buildSelects(); populateWilayas();
     bindForm(); bindModal();
-    if (state.products.length) chooseHat(state.products[0], true);
+    renderCart(); updateTotals();
   }
 
   function renderHeader() {
@@ -48,8 +49,12 @@
     $("#year").textContent = new Date().getFullYear();
     if (s.tagline) $("#kicker").textContent = s.tagline;
     $$(".cur").forEach((el) => (el.textContent = cur()));
-    $("#pkCur").textContent = cur();
     document.title = `${s.storeName || "Swish"} — قبعات ستريت وير | الدفع عند الاستلام`;
+    // عرض الباقة
+    if (s.bundleEnabled && s.bundlePrice > 0) {
+      $("#bundleText").textContent = `العرض: ${s.bundleSize} قطع بـ ${fmt(s.bundlePrice)} ${cur()} فقط — اختر أكثر ووفّر!`;
+      $("#bundleBanner").hidden = false;
+    }
   }
 
   const disc = (p) => (p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0);
@@ -58,13 +63,13 @@
   function buildCarousel() {
     const track = $("#carTrack");
     if (!state.products.length) {
-      track.innerHTML = `<div class="slide"><div class="slide-body"><p class="slide-desc">لا توجد منتجات متاحة حاليًا.</p></div></div>`;
+      track.innerHTML = `<div class="slide is-active"><div class="slide-body"><p class="slide-desc">لا توجد منتجات متاحة حاليًا.</p></div></div>`;
       $("#carPrev").hidden = $("#carNext").hidden = true; return;
     }
     track.innerHTML = state.products.map((p, i) => {
       const d = disc(p), img = (p.images && p.images[0]) || placeholder;
       return `
-      <div class="slide" data-i="${i}">
+      <div class="slide${i === 0 ? " is-active" : ""}" data-i="${i}">
         <div class="slide-media">
           <img src="${esc(img)}" alt="${esc(p.name)}" ${i === 0 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'} draggable="false" />
           ${p.badge ? `<span class="slide-badge">${esc(p.badge)}</span>` : ""}
@@ -78,7 +83,7 @@
               <span class="slide-now">${fmt(p.price)}</span><span class="slide-cur">${cur()}</span>
               ${p.oldPrice ? `<span class="slide-old">${fmt(p.oldPrice)}</span>` : ""}
             </div>
-            <button type="button" class="choose" data-id="${p.id}"><svg aria-hidden="true"><use href="#i-chev-l"/></svg><span>اختر</span></button>
+            <button type="button" class="choose" data-id="${p.id}"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>أضِف</span></button>
           </div>
         </div>
       </div>`;
@@ -87,7 +92,7 @@
     $("#carDots").innerHTML = state.manyDots
       ? `<span class="car-count"><b id="carIdx">1</b> / ${state.products.length}</span>`
       : state.products.map((_, i) => `<button class="dot${i === 0 ? " active" : ""}" data-dot="${i}" aria-label="موديل ${i + 1}"></button>`).join("");
-    track.addEventListener("click", (e) => { const b = e.target.closest(".choose"); if (!b) return; const p = state.products.find((x) => x.id === Number(b.dataset.id)); if (p) chooseHat(p); });
+    track.addEventListener("click", (e) => { const b = e.target.closest(".choose"); if (!b) return; const p = state.products.find((x) => x.id === Number(b.dataset.id)); if (p) toggleCart(p); });
     $("#carDots").addEventListener("click", (e) => { const d = e.target.closest(".dot"); if (d) go(Number(d.dataset.dot)); });
   }
 
@@ -95,6 +100,7 @@
     const n = state.products.length; if (!n) return;
     state.index = Math.max(0, Math.min(n - 1, i));
     $("#carTrack").style.transform = `translateX(${-state.index * 100}%)`;
+    $$("#carTrack .slide").forEach((s, k) => s.classList.toggle("is-active", k === state.index));
     if (state.manyDots) { const idx = document.getElementById("carIdx"); if (idx) idx.textContent = state.index + 1; }
     else $$("#carDots .dot").forEach((d, k) => d.classList.toggle("active", k === state.index));
   }
@@ -103,49 +109,104 @@
     const vp = $("#carViewport"), track = $("#carTrack");
     $("#carPrev").addEventListener("click", () => go(state.index - 1));
     $("#carNext").addEventListener("click", () => go(state.index + 1));
-    let startX = 0, dragging = false, delta = 0;
-    vp.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; dragging = true; startX = e.clientX; delta = 0; track.style.transition = "none"; });
-    window.addEventListener("pointermove", (e) => { if (!dragging) return; delta = e.clientX - startX; track.style.transform = `translateX(calc(${-state.index * 100}% + ${delta}px))`; });
-    const up = () => { if (!dragging) return; dragging = false; track.style.transition = ""; const w = vp.clientWidth || 1; if (Math.abs(delta) > w * 0.16) go(state.index + (delta < 0 ? 1 : -1)); else go(state.index); delta = 0; };
+    let startX = 0, lastX = 0, lastT = 0, vel = 0, dragging = false, delta = 0;
+    vp.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      dragging = true; startX = lastX = e.clientX; lastT = e.timeStamp || 0; vel = 0; delta = 0;
+      track.style.transition = "none"; track.classList.add("dragging");
+    });
+    window.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      delta = e.clientX - startX;
+      const dt = (e.timeStamp || 0) - lastT;
+      if (dt > 0) vel = (e.clientX - lastX) / dt; // px/ms
+      lastX = e.clientX; lastT = e.timeStamp || 0;
+      // مقاومة خفيفة عند الأطراف
+      let d = delta;
+      if ((state.index === 0 && d > 0) || (state.index === state.products.length - 1 && d < 0)) d *= 0.35;
+      track.style.transform = `translateX(calc(${-state.index * 100}% + ${d}px))`;
+    });
+    const up = () => {
+      if (!dragging) return;
+      dragging = false; track.style.transition = ""; track.classList.remove("dragging");
+      const w = vp.clientWidth || 1;
+      // flick سريع أو سحب كافٍ
+      if (vel < -0.45 || delta < -w * 0.18) go(state.index + 1);
+      else if (vel > 0.45 || delta > w * 0.18) go(state.index - 1);
+      else go(state.index);
+      delta = 0; vel = 0;
+    };
     window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
     window.addEventListener("resize", () => go(state.index));
     vp.setAttribute("tabindex", "0");
     vp.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") go(state.index + 1); if (e.key === "ArrowRight") go(state.index - 1); });
   }
 
-  // ---------- choose ----------
-  function chooseHat(p, silent) {
-    state.current = p;
-    $("#pkImg").src = (p.images && p.images[0]) || placeholder;
-    $("#pkName").textContent = p.name;
-    $("#pkNow").textContent = fmt(p.price);
-    $("#pkOld").textContent = p.oldPrice ? `${fmt(p.oldPrice)} ${cur()}` : "";
-    // اللون
-    if (p.colors && p.colors.length) {
-      state.colorSel.setOptions(p.colors.map((c) => ({ value: c, label: c })));
-      state.colorSel.setValue(p.colors[0]);
-      $("#colorFld").style.display = "";
-    } else { $("#colorFld").style.display = "none"; if (state.colorSel) state.colorSel.setOptions([]); }
-
-    $$(".choose").forEach((b) => {
-      const on = Number(b.dataset.id) === p.id;
-      b.classList.toggle("is-picked", on);
-      b.querySelector("span").textContent = on ? "تم الاختيار" : "اختر";
-      b.querySelector("use").setAttribute("href", on ? "#i-check" : "#i-chev-l");
-    });
-
-    updateTotals();
-    if (!state.pixel.viewed.has(p.id)) {
+  // ---------- cart ----------
+  function toggleCart(p) {
+    if (state.cart.has(p.id)) state.cart.delete(p.id);
+    else state.cart.set(p.id, { product: p, qty: 1, color: (p.colors && p.colors[0]) || "" });
+    updateChooseButtons();
+    renderCart(); updateTotals();
+    // Pixel: ViewContent مرة لكل منتج عند أول إضافة
+    if (state.cart.has(p.id) && !state.pixel.viewed.has(p.id)) {
       track("ViewContent", { content_name: p.name, content_ids: [String(p.id)], content_type: "product", value: p.price, currency: "DZD" });
       state.pixel.viewed.add(p.id);
     }
-    if (!silent) {
-      const pk = $("#picked"); pk.classList.remove("flash"); void pk.offsetWidth; pk.classList.add("flash");
-      if (window.matchMedia("(max-width: 920px)").matches) $("#picked").scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    const c = $("#cart"); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash");
+    if (state.cart.has(p.id) && window.matchMedia("(max-width: 920px)").matches) $("#cart").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  // ---------- custom glass select ----------
+  function updateChooseButtons() {
+    $$(".choose").forEach((b) => {
+      const on = state.cart.has(Number(b.dataset.id));
+      b.classList.toggle("is-picked", on);
+      b.querySelector("span").textContent = on ? "أُضيف" : "أضِف";
+      b.querySelector("use").setAttribute("href", on ? "#i-check" : "#i-plus");
+    });
+  }
+
+  function renderCart() {
+    const box = $("#cart");
+    if (!state.cart.size) {
+      box.innerHTML = `<div class="cart-empty"><svg aria-hidden="true"><use href="#i-bag"/></svg> اختر قبعة أو أكثر من الأعلى</div>`;
+      return;
+    }
+    box.innerHTML = [...state.cart.values()].map((l) => {
+      const p = l.product;
+      const colorSel = (p.colors && p.colors.length)
+        ? `<select class="cart-color" data-id="${p.id}">${p.colors.map((c) => `<option value="${esc(c)}"${c === l.color ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`
+        : "";
+      return `
+      <div class="cart-line" data-id="${p.id}">
+        <img class="cart-thumb" src="${esc((p.images && p.images[0]) || placeholder)}" alt="" />
+        <div class="cart-info">
+          <div class="cart-name">${esc(p.name)}</div>
+          <div class="cart-price">${fmt(p.price)} ${cur()}</div>
+          ${colorSel}
+        </div>
+        <div class="cart-qty">
+          <button type="button" data-dec="${p.id}" aria-label="إنقاص"><svg aria-hidden="true"><use href="#i-minus"/></svg></button>
+          <span>${l.qty}</span>
+          <button type="button" data-inc="${p.id}" aria-label="زيادة"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
+        </div>
+        <button type="button" class="cart-remove" data-remove="${p.id}" aria-label="حذف"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>`;
+    }).join("");
+
+    box.querySelectorAll("[data-inc]").forEach((b) => b.addEventListener("click", () => changeQty(Number(b.dataset.inc), 1)));
+    box.querySelectorAll("[data-dec]").forEach((b) => b.addEventListener("click", () => changeQty(Number(b.dataset.dec), -1)));
+    box.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", () => { state.cart.delete(Number(b.dataset.remove)); updateChooseButtons(); renderCart(); updateTotals(); }));
+    box.querySelectorAll(".cart-color").forEach((sel) => sel.addEventListener("change", () => { const l = state.cart.get(Number(sel.dataset.id)); if (l) l.color = sel.value; }));
+  }
+
+  function changeQty(id, d) {
+    const l = state.cart.get(id); if (!l) return;
+    l.qty = Math.max(1, Math.min(99, l.qty + d));
+    renderCart(); updateTotals();
+  }
+
+  // ---------- custom glass select (wilaya) ----------
   function makeSelect(mountId, hiddenId, opts) {
     opts = opts || {};
     const mount = $(mountId), hidden = $(hiddenId);
@@ -156,7 +217,6 @@
     const btn = mount.querySelector(".cs-btn"), panel = mount.querySelector(".cs-panel"),
       list = mount.querySelector(".cs-list"), valEl = mount.querySelector(".cs-val"),
       search = mount.querySelector(".cs-search input");
-
     function render(filter) {
       const f = (filter || "").trim().toLowerCase();
       const rows = options.filter((o) => !f || o.label.toLowerCase().includes(f));
@@ -171,73 +231,77 @@
     list.addEventListener("click", (e) => { const o = e.target.closest(".cs-opt"); if (!o) return; setValue(o.dataset.v); closeP(); });
     document.addEventListener("click", (e) => { if (open && !mount.contains(e.target)) closeP(); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) closeP(); });
-
     function setValue(v) {
       value = String(v);
       const o = options.find((x) => String(x.value) === value);
       valEl.textContent = o ? o.label : (opts.placeholder || "اختر");
-      mount.classList.toggle("has-val", !!value);
-      mount.classList.remove("invalid");
-      hidden.value = value;
-      hidden.dispatchEvent(new Event("change", { bubbles: true }));
+      mount.classList.toggle("has-val", !!value); mount.classList.remove("invalid");
+      hidden.value = value; hidden.dispatchEvent(new Event("change", { bubbles: true }));
       render(search ? search.value : "");
     }
-    function setOptions(op) { options = op || []; value = ""; hidden.value = ""; valEl.textContent = opts.placeholder || "اختر"; mount.classList.remove("has-val"); render(""); }
+    function setOptions(op) { options = op || []; render(""); }
     setOptions(opts.options || []);
     return { setOptions, setValue, getValue: () => value, markInvalid: (b) => mount.classList.toggle("invalid", !!b) };
   }
-
   function buildSelects() {
     state.wilayaSel = makeSelect("#wilayaCs", "#fWilaya", { placeholder: "اختر الولاية", searchable: true, icon: "i-pin" });
-    state.colorSel = makeSelect("#colorCs", "#fColor", { placeholder: "اختر اللون" });
     $("#fWilaya").addEventListener("change", () => { updateDeliv(); updateTotals(); });
-    $("#fColor").addEventListener("change", updateTotals);
   }
-
-  function populateWilayas() {
-    state.wilayaSel.setOptions(state.wilayas.map((w) => ({ value: w.code, label: `${w.code} - ${w.name}` })));
-  }
+  function populateWilayas() { state.wilayaSel.setOptions(state.wilayas.map((w) => ({ value: w.code, label: `${w.code} - ${w.name}` }))); }
   const selWilaya = () => state.wilayas.find((w) => w.code === Number($("#fWilaya").value)) || null;
   const delivType = () => (document.querySelector('input[name="deliveryType"]:checked') || {}).value || "home";
-
   function updateDeliv() {
     const w = selWilaya();
     $("#pHome").textContent = w ? `${fmt(w.home)} ${cur()}` : "—";
     $("#pDesk").textContent = w ? `${fmt(w.desk)} ${cur()}` : "—";
   }
-  const qty = () => Math.max(1, Math.min(99, parseInt($("#fQty").value, 10) || 1));
+
+  // ---------- bundle pricing (mirror of server) ----------
+  function bundlePricing(units) {
+    const s = state.settings;
+    const regular = units.reduce((a, b) => a + b, 0);
+    if (!s.bundleEnabled || !(s.bundlePrice > 0) || units.length < s.bundleSize) return { subtotal: regular, regular, savings: 0 };
+    const N = Math.floor(s.bundleSize), X = Number(s.bundlePrice);
+    const sorted = [...units].sort((a, b) => b - a);
+    const packs = Math.floor(sorted.length / N);
+    const remainder = sorted.slice(packs * N).reduce((a, b) => a + b, 0);
+    const subtotal = packs * X + remainder;
+    return { subtotal, regular, savings: Math.max(0, regular - subtotal) };
+  }
 
   function updateTotals() {
-    const p = state.current; if (!p) return;
-    const q = qty(), sub = p.price * q, w = selWilaya();
+    const lines = [...state.cart.values()];
+    const units = [];
+    lines.forEach((l) => { for (let i = 0; i < l.qty; i++) units.push(l.product.price); });
+    const totalQty = units.length;
+    const { subtotal, regular, savings } = bundlePricing(units);
+    const w = selWilaya();
     let fee = w ? (delivType() === "desk" ? w.desk : w.home) : null;
     const thr = Number(state.settings.freeShippingThreshold) || 0;
     let free = false;
-    if (w && thr > 0 && sub >= thr) { fee = 0; free = true; }
-    const total = sub + (fee || 0);
-    $("#tSub").textContent = fmt(sub);
-    const saved = p.oldPrice && p.oldPrice > p.price ? (p.oldPrice - p.price) * q : 0;
-    if (saved > 0) { $("#tSave").textContent = `${fmt(saved)} ${cur()}`; $("#tSaveRow").hidden = false; } else $("#tSaveRow").hidden = true;
-    $("#tDeliv").textContent = fee === null ? "اختر الولاية" : free ? "مجاني" : `${fmt(fee)} ${cur()}`;
+    if (w && thr > 0 && subtotal >= thr) { fee = 0; free = true; }
+    const total = subtotal + (fee || 0);
+    $("#tQty").textContent = totalQty;
+    $("#tSub").textContent = fmt(regular);
+    if (savings > 0) { $("#tSave").textContent = `- ${fmt(savings)} ${cur()}`; $("#tSaveRow").hidden = false; } else $("#tSaveRow").hidden = true;
+    $("#tDeliv").textContent = !totalQty ? "—" : fee === null ? "اختر الولاية" : free ? "مجاني" : `${fmt(fee)} ${cur()}`;
     $("#tTotal").textContent = fmt(total);
   }
 
   // ---------- form ----------
   function bindForm() {
-    $("#qMinus").addEventListener("click", () => { $("#fQty").value = Math.max(1, qty() - 1); updateTotals(); });
-    $("#qPlus").addEventListener("click", () => { $("#fQty").value = Math.min(99, qty() + 1); updateTotals(); });
-    $("#fQty").addEventListener("input", updateTotals);
     $$('input[name="deliveryType"]').forEach((r) => r.addEventListener("change", () => { toggleAddr(); updateTotals(); }));
     toggleAddr();
     ["#fName", "#fPhone"].forEach((id) => $(id).addEventListener("focus", () => {
-      if (!state.pixel.checkout && state.current) {
-        track("InitiateCheckout", { content_ids: [String(state.current.id)], content_name: state.current.name, content_type: "product", num_items: qty(), value: state.current.price * qty(), currency: "DZD" });
+      if (!state.pixel.checkout && state.cart.size) {
+        const ids = [...state.cart.keys()].map(String);
+        const units = []; [...state.cart.values()].forEach((l) => { for (let i = 0; i < l.qty; i++) units.push(l.product.price); });
+        track("InitiateCheckout", { content_ids: ids, content_type: "product", num_items: units.length, value: bundlePricing(units).subtotal, currency: "DZD" });
         state.pixel.checkout = true;
       }
     }, { once: true }));
     $("#orderForm").addEventListener("submit", onSubmit);
   }
-
   function toggleAddr() {
     const home = delivType() === "home";
     $("#addrFld").querySelector("label").innerHTML = home ? 'العنوان / البلدية <i>*</i>' : "العنوان / البلدية (اختياري)";
@@ -257,21 +321,23 @@
 
   async function onSubmit(e) {
     e.preventDefault(); formErr("");
-    if (!state.current) { formErr("اختر موديل القبعة أولًا"); return; }
+    if (!state.cart.size) { formErr("اختر قبعة واحدة على الأقل من الأعلى"); return; }
     if (!validate()) { document.querySelector(".invalid")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     const btn = $("#submitBtn"), label = btn.querySelector("span").textContent;
     btn.disabled = true; btn.querySelector("span").textContent = "جاري الإرسال...";
+    const items = [...state.cart.values()].map((l) => ({ productId: l.product.id, quantity: l.qty, color: l.color || "" }));
     const payload = {
-      productId: state.current.id, fullName: $("#fName").value.trim(), phone: $("#fPhone").value.trim(),
+      items, fullName: $("#fName").value.trim(), phone: $("#fPhone").value.trim(),
       wilaya: $("#fWilaya").value, address: $("#fAddress").value.trim(), deliveryType: delivType(),
-      color: state.current.colors && state.current.colors.length ? $("#fColor").value : "", quantity: qty(),
     };
     try {
       const res = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "تعذّر إرسال الطلب");
-      track("Purchase", { content_ids: [String(state.current.id)], content_name: state.current.name, content_type: "product", num_items: payload.quantity, value: data.total, currency: "DZD" }, { eventID: "order_" + data.orderId });
+      const ids = items.map((i) => String(i.productId)), numItems = items.reduce((s, i) => s + i.quantity, 0);
+      track("Purchase", { content_ids: ids, content_type: "product", num_items: numItems, value: data.total, currency: "DZD" }, { eventID: "order_" + data.orderId });
       $("#okRef").textContent = data.ref; openModal();
+      state.cart.clear(); updateChooseButtons(); renderCart();
       $("#orderForm").reset(); state.wilayaSel.setOptions(state.wilayas.map((w) => ({ value: w.code, label: `${w.code} - ${w.name}` }))); toggleAddr(); updateDeliv(); updateTotals();
     } catch (err) { formErr((err.message || "حدث خطأ") + " — حاول مرة أخرى"); }
     finally { btn.disabled = false; btn.querySelector("span").textContent = label; }

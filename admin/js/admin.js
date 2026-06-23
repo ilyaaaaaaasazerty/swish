@@ -55,6 +55,15 @@
     return `<span class="badge" style="background:${s.color}"><span class="dot"></span>${escapeHtml(s.label)}</span>`;
   }
 
+  // عناصر الطلب: دعم السلة المتعددة (items[]) مع التوافق مع الطلب القديم (item)
+  function itemsOf(o) { return Array.isArray(o.items) && o.items.length ? o.items : (o.item ? [o.item] : []); }
+  function itemsSummary(o) {
+    const it = itemsOf(o);
+    if (!it.length) return "—";
+    const q = it.reduce((s, i) => s + (i.quantity || 0), 0);
+    return it.length === 1 ? `${escapeHtml(it[0].productName)} <span class="chip">×${it[0].quantity}</span>` : `<span class="chip">${it.length} منتجات · ${q} قطعة</span>`;
+  }
+
   // ---------- القائمة الجانبية (موبايل) ----------
   function initSidebar() {
     const toggle = $("#menuToggle");
@@ -197,7 +206,7 @@
         <tr>
           <td><b>${escapeHtml(o.ref)}</b></td>
           <td>${escapeHtml(o.customer.fullName)}</td>
-          <td>${escapeHtml(o.item.productName)}</td>
+          <td>${itemsSummary(o)}</td>
           <td>${escapeHtml(o.shipping.wilayaName)}</td>
           <td><b>${money(o.pricing.total)}</b></td>
           <td>${statusBadge(o.status)}</td>
@@ -437,7 +446,7 @@
             <td style="font-size:.85rem;color:var(--muted)">${fmtDate(o.createdAt)}</td>
             <td>${escapeHtml(o.customer.fullName)}</td>
             <td dir="ltr" style="text-align:right">${escapeHtml(o.customer.phone)}</td>
-            <td>${escapeHtml(o.item.productName)} <span class="chip">×${o.item.quantity}</span></td>
+            <td>${itemsSummary(o)}</td>
             <td>${escapeHtml(o.shipping.wilayaName)}</td>
             <td><b>${money(o.pricing.total)}</b></td>
             <td>${statusBadge(o.status)}</td>
@@ -454,7 +463,9 @@
       currentOrder = o;
       $("#omTitle").textContent = `الطلب ${o.ref}`;
       const dt = o.shipping.deliveryType === "desk" ? "مكتب التوصيل" : "إلى المنزل";
-      const variant = o.item.color || "—";
+      const its = itemsOf(o);
+      const itemsHtml = its.map((i) => `<div class="detail-row"><span>${escapeHtml(i.productName)}${i.color ? " — " + escapeHtml(i.color) : ""} <span class="chip">×${i.quantity}</span></span><b>${money((i.unitPrice || 0) * (i.quantity || 1))}</b></div>`).join("");
+      const savings = (o.pricing && o.pricing.bundleSavings) || 0;
       const timeline = (o.history || [])
         .map((h) => `<div class="tl-item"><span class="tl-dot" style="background:${(statusMap[h.status] || {}).color || "#999"}"></span> ${escapeHtml((statusMap[h.status] || {}).label || h.status)} — <span style="color:var(--muted)">${fmtDate(h.at)}</span></div>`)
         .join("");
@@ -469,12 +480,10 @@
             <div class="detail-row"><span>العنوان</span><b class="wrap">${escapeHtml(o.shipping.address || "—")}</b></div>
           </div>
           <div class="detail-box">
-            <h4>🧢 تفاصيل الطلب</h4>
-            <div class="detail-row"><span>المنتج</span><b>${escapeHtml(o.item.productName)}</b></div>
-            <div class="detail-row"><span>اللون</span><b>${escapeHtml(variant)}</b></div>
-            <div class="detail-row"><span>الكمية</span><b>${o.item.quantity}</b></div>
-            <div class="detail-row"><span>سعر الوحدة</span><b>${money(o.item.unitPrice)}</b></div>
-            <div class="detail-row"><span>المجموع الفرعي</span><b>${money(o.pricing.subtotal)}</b></div>
+            <h4>🧢 المنتجات (${its.length})</h4>
+            ${itemsHtml}
+            <div class="detail-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>المجموع الفرعي</span><b>${money(o.pricing.subtotal)}</b></div>
+            ${savings > 0 ? `<div class="detail-row"><span>توفير الباقة</span><b style="color:#059669">- ${money(savings)}</b></div>` : ""}
             <div class="detail-row"><span>التوصيل</span><b>${o.pricing.freeShipping ? "مجاني" : money(o.pricing.deliveryFee)}</b></div>
             <div class="detail-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>المجموع الكلي</span><b style="color:var(--brand);font-size:1.1rem">${money(o.pricing.total)}</b></div>
           </div>
@@ -530,7 +539,11 @@
       $("#sInstagram").value = s.instagramUrl || "";
       $("#sRatingValue").value = s.ratingValue || 4.8;
       $("#sRatingCount").value = s.ratingCount || 0;
+      $("#sBundleEnabled").checked = !!s.bundleEnabled;
+      $("#sBundleSize").value = s.bundleSize || 2;
+      $("#sBundlePrice").value = s.bundlePrice || "";
       updatePixelStatus(s.metaPixelId);
+      updateBundlePreview();
     } catch (e) { toast(e.message, "err"); }
 
     $("#savePixel").addEventListener("click", async () => {
@@ -542,8 +555,31 @@
       } catch (e) { toast(e.message, "err"); }
     });
 
+    ["#sBundleEnabled", "#sBundleSize", "#sBundlePrice"].forEach((id) => $(id).addEventListener("input", updateBundlePreview));
+    $("#saveBundle").addEventListener("click", saveBundle);
     $("#saveSettings").addEventListener("click", saveSettings);
     $("#saveAccount").addEventListener("click", saveAccount);
+  }
+
+  function updateBundlePreview() {
+    const on = $("#sBundleEnabled").checked, n = Number($("#sBundleSize").value) || 2, x = Number($("#sBundlePrice").value) || 0;
+    const el = $("#bundlePreview");
+    if (on && x > 0) el.innerHTML = `العرض الحالي: <b>${n} قطع بـ ${x.toLocaleString("en-US")} ${CURRENCY}</b> (بدلًا من سعرها الأصلي).`;
+    else el.textContent = "العرض غير مُفعّل.";
+  }
+
+  async function saveBundle() {
+    const payload = {
+      bundleEnabled: $("#sBundleEnabled").checked,
+      bundleSize: Number($("#sBundleSize").value) || 2,
+      bundlePrice: Number($("#sBundlePrice").value) || 0,
+    };
+    if (payload.bundleEnabled && payload.bundlePrice <= 0) return toast("حدّد سعر الباقة", "err");
+    const btn = $("#saveBundle");
+    btn.disabled = true;
+    try { await api("/admin/settings", { method: "PUT", body: JSON.stringify(payload) }); toast("تم حفظ عرض الباقة"); }
+    catch (e) { toast(e.message, "err"); }
+    finally { btn.disabled = false; }
   }
 
   function updatePixelStatus(id) {
