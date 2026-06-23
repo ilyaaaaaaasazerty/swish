@@ -22,14 +22,17 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--ink);
   line-height: 1.6;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
+  position: relative;
   -webkit-font-smoothing: antialiased;
   background-image:
     radial-gradient(1100px 600px at 80% -10%, #1c1c22 0%, transparent 55%),
@@ -82,7 +85,8 @@ button { font-family: var(--font); cursor: pointer; }
   margin: 4px auto 22px; max-width: 640px;
 }
 .grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 22px; align-items: start; }
-@media (min-width: 921px) { .carousel { position: sticky; top: 14px; } }
+.grid > section { min-width: 0; }
+.carousel, .car-viewport, .order { min-width: 0; max-width: 100%; }
 
 /* ===== الكاروسيل ===== */
 .carousel { position: relative; padding: 16px; overflow: hidden; display: flex; flex-direction: column; }
@@ -136,6 +140,8 @@ button { font-family: var(--font); cursor: pointer; }
 .car-dots { display: flex; gap: 7px; justify-content: center; margin-top: 12px; }
 .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--line-2); border: none; padding: 0; transition: all .25s; }
 .dot.active { width: 22px; background: var(--white); }
+.car-count { font-family: var(--display); letter-spacing: 1px; font-size: 1.05rem; color: var(--grey); }
+.car-count b { color: var(--white); }
 
 /* ===== الفورم ===== */
 .order { padding: clamp(18px, 3vw, 26px); }

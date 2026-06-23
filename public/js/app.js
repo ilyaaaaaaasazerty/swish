@@ -83,7 +83,10 @@
         </div>
       </div>`;
     }).join("");
-    $("#carDots").innerHTML = state.products.map((_, i) => `<button class="dot${i === 0 ? " active" : ""}" data-dot="${i}" aria-label="موديل ${i + 1}"></button>`).join("");
+    state.manyDots = state.products.length > 12;
+    $("#carDots").innerHTML = state.manyDots
+      ? `<span class="car-count"><b id="carIdx">1</b> / ${state.products.length}</span>`
+      : state.products.map((_, i) => `<button class="dot${i === 0 ? " active" : ""}" data-dot="${i}" aria-label="موديل ${i + 1}"></button>`).join("");
     track.addEventListener("click", (e) => { const b = e.target.closest(".choose"); if (!b) return; const p = state.products.find((x) => x.id === Number(b.dataset.id)); if (p) chooseHat(p); });
     $("#carDots").addEventListener("click", (e) => { const d = e.target.closest(".dot"); if (d) go(Number(d.dataset.dot)); });
   }
@@ -92,7 +95,8 @@
     const n = state.products.length; if (!n) return;
     state.index = Math.max(0, Math.min(n - 1, i));
     $("#carTrack").style.transform = `translateX(${-state.index * 100}%)`;
-    $$("#carDots .dot").forEach((d, k) => d.classList.toggle("active", k === state.index));
+    if (state.manyDots) { const idx = document.getElementById("carIdx"); if (idx) idx.textContent = state.index + 1; }
+    else $$("#carDots .dot").forEach((d, k) => d.classList.toggle("active", k === state.index));
   }
 
   function initCarousel() {
